@@ -143,7 +143,7 @@ def order_book(orders, book, stock_name):
 
 def generate_csv():
     """ Generate a CSV of order history. """
-    with open('test.csv', 'wb') as f:
+    with open('test.csv', 'w', newline='') as f:  # Open the file in text mode
         writer = csv.writer(f)
         for t, stock, side, order, size in orders(market()):
             if t > MARKET_OPEN + SIM_LENGTH:
@@ -241,8 +241,16 @@ class App(object):
         self._data_1    = order_book(read_csv(), self._book_1, 'ABC')
         self._data_2    = order_book(read_csv(), self._book_2, 'DEF')
         self._rt_start = datetime.now()
-        self._sim_start, _, _  = next(self._data_1)
+        self._sim_start, _, _ = self.safe_next(self._data_1)
         self.read_10_first_lines()
+
+    def safe_next(self, iterator):
+        """ Safely get the next item from an iterator, handling StopIteration. """
+        try:
+            return next(iterator)
+        except StopIteration:
+            print("Error: No data available in iterator.")
+            return None, None, None
 
     @property
     def _current_book_1(self):
@@ -263,25 +271,25 @@ class App(object):
                 yield t, bids, asks
 
     def read_10_first_lines(self):
-            for _ in iter(range(10)):
-                next(self._data_1)
-                next(self._data_2)
+        for _ in iter(range(10)):
+            self.safe_next(self._data_1)
+            self.safe_next(self._data_2)
 
     @route('/query')
     def handle_query(self, x):
-        """ Takes no arguments, and yields the current top of the book;  the
+        """ Takes no arguments, and yields the current top of the book; the
             best bid and ask and their sizes
         """
         try:
             t1, bids1, asks1 = next(self._current_book_1)
             t2, bids2, asks2 = next(self._current_book_2)
         except Exception as e:
-            print ("error getting stocks...reinitalizing app")
+            print("Error getting stocks...reinitalizing app")
             self.__init__()
             t1, bids1, asks1 = next(self._current_book_1)
             t2, bids2, asks2 = next(self._current_book_2)
         t = t1 if t1 > t2 else t2
-        print ('Query received @ t%s' % t)
+        print('Query received @ t%s' % t)
         return [{
             'id': x and x.get('id', None),
             'stock': 'ABC',
